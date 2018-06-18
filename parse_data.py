@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pickle
 
 def usage():
-    print("Usage: " + sys.argv[0] + " -m <metric to fetch> [-i <input file>]")
+    print("Usage: python " + sys.argv[0] + " -m <metric to fetch> [-i <input file>]")
     print("    -m --metric: The metric to fetch data from")
     print("    -i --infile: The inputfile to read data from. default: stdin")
     print("    -g --graph: Plot the result with matplotlib")
