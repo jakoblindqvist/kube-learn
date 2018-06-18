@@ -2,31 +2,61 @@
 
 import sys, getopt
 import pyKairosDB
+import requests
+import pickle
 
 def usage():
-    print("usage: python kube-learn -i <ip> -p <port>")
+    print("Usage: python kube-learn [-i <ip>] [-p <port>] [-o <output file>]")
+    print("    --ip: The ip to kairosDB. default: 127.0.0.1")
+    print("    --port: The port to kairosDB. default: 8080")
+    print("    --output: File to save serialized result (pickle is used). default: Print non-serialized object to stdout")
+    print("    --brief: Shows only the metric names in the database")
+    print("    --help: Displays this text")
 
-if(len(sys.argv) < 3):
-    usage()
-    sys.exit(1)
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'i:p:')
+    opts, args = getopt.getopt(sys.argv[1:], 'hbo:i:p:', ["help", "output=", "port=", "ip=", "brief"])
 except getopt.GetoptError as err:
     print(err)
     usage()
     sys.exit(1)
 
-ip = ""
-port = ""
+ip = "127.0.0.1"
+port = "8080"
+outfile = None
+brief = False
 for o, a in opts:
-    if o == '-i':
+    if o in ('-i', '--ip'):
         ip = a
-    elif o == '-p':
+    elif o in ('-p', '--port'):
         port = a
+    elif o in ('-o', '--output'):
+        outfile = a
+    elif o in ("-h", "--help"):
+        usage()
+        exit()
+    elif o in ("-b", "--brief"):
+        brief = True
 
-c = pyKairosDB.connect(ip, port, False)
+try:
+    con = pyKairosDB.connect(ip, port, False)
+except requests.exceptions.ConnectionError as err:
+    print >> sys.stderr, (err)
+    print()
+    usage()
+    exit(1)
 
-l = pyKairosDB.metadata.get_all_metric_names(c)
+metric_names = pyKairosDB.metadata.get_all_metric_names(con)
 
-for e in l:
-    print e
+if brief:
+    for name in metric_names:
+        print name
+    exit()
+
+content = con.read_relative(metric_names, (1, 'days'))
+
+if outfile != None:
+    with open(outfile, "wb") as file:
+        pickle.dump(content, file, pickle.HIGHEST_PROTOCOL)
+    print("Wrote results to \"" + outfile + "\"")
+else:
+    print content
