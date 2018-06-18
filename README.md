@@ -1,3 +1,4 @@
 # kube-learn
 
-![System overview](/img/architecture.ng)
+![System overview](/img/architecture.png)
+
