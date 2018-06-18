@@ -7,7 +7,7 @@ import pickle
 import re
 
 def usage():
-    print("Usage: python " sys.argv[0] " [-i <ip>] [-p <port>] [-o <output file>]")
+    print("Usage: python " + sys.argv[0] + " [-i <ip>] [-p <port>] [-o <output file>]")
     print("    -i --ip: The ip to kairosDB. default: 127.0.0.1")
     print("    -p --port: The port to kairosDB. default: 8080")
     print("    -o --output: File to save serialized result (pickle is used). default: stdout")
