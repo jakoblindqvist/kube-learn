@@ -4,17 +4,19 @@ import sys, getopt
 import pyKairosDB
 import requests
 import pickle
+import re
 
 def usage():
     print("Usage: python kube-learn [-i <ip>] [-p <port>] [-o <output file>]")
     print("    --ip: The ip to kairosDB. default: 127.0.0.1")
     print("    --port: The port to kairosDB. default: 8080")
     print("    --output: File to save serialized result (pickle is used). default: Print non-serialized object to stdout")
+    print("    --regex: Filter output")
     print("    --brief: Shows only the metric names in the database")
     print("    --help: Displays this text")
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'hbo:i:p:', ["help", "output=", "port=", "ip=", "brief"])
+    opts, args = getopt.getopt(sys.argv[1:], 'hbo:i:p:r:', ["help", "output=", "port=", "ip=", "brief", "regex="])
 except getopt.GetoptError as err:
     print(err)
     usage()
@@ -24,6 +26,7 @@ ip = "127.0.0.1"
 port = "8080"
 outfile = None
 brief = False
+regex = ""
 for o, a in opts:
     if o in ('-i', '--ip'):
         ip = a
@@ -36,6 +39,10 @@ for o, a in opts:
         exit()
     elif o in ("-b", "--brief"):
         brief = True
+    elif o in ("-r", "--regex"):
+        regex = a
+
+filter = re.compile(regex)
 
 try:
     con = pyKairosDB.connect(ip, port, False)
@@ -47,12 +54,18 @@ except requests.exceptions.ConnectionError as err:
 
 metric_names = pyKairosDB.metadata.get_all_metric_names(con)
 
+filtered_metrics = []
+
+for name in metric_names:
+    if filter.search(name):
+        filtered_metrics.append(name)
+        if brief:
+            print name
+
 if brief:
-    for name in metric_names:
-        print name
     exit()
 
-content = con.read_relative(metric_names, (1, 'days'))
+content = con.read_relative(filtered_metrics, (1, 'days'))
 
 if outfile != None:
     with open(outfile, "wb") as file:
