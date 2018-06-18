@@ -39,7 +39,7 @@ for o, a in opts:
         exit()
 
 if not metric:
-    print >> sys.stderr, ("Not enough arguments not specified")
+    print("You must specify a metric")
     usage()
     exit(1)
 
@@ -52,7 +52,14 @@ else:
 result = pyKairosDB.util.get_content_values_by_name(content, metric)
 
 if len(result) < 1:
-    print("Can't find any data for metric " + metric)
+    print("Can't find any data for metric \"" + metric + "\"")
+    print("Did you mean any of these:")
+
+    results = pyKairosDB.util.content_by_name_substring(content, metric)
+    for result in results:
+        print("  " + result['name'])
+
+    exit(1)
 
 data = result[0]['values']
 
