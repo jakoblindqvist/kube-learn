@@ -58,6 +58,7 @@ if len(result) < 1:
     results = pyKairosDB.util.content_by_name_substring(content, metric)
     for result in results:
         print("  " + result['name'])
+        #print(result)
 
     exit(1)
 
