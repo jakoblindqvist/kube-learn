@@ -10,12 +10,12 @@ from influxdb import InfluxDBClient
 
 def usage():
     print("Usage: python " + sys.argv[0] + " -m <measurement> -g <group>")
-    print("    -m --measurement: (required)")
-    print("    -g --group: comma separated(required)")
-    print("    -v --value: ")
-    print("    --rate-time: ")
-    print("    -r --rate: ")
-    print("    -t --text: ")
+    print("    -m --measurement: The measurement to fetch (required)")
+    print("    -g --group: Which tags to group by separaded by comma (required)")
+    print("    -v --value: The values to fetch. default: f64")
+    print("    -r --rate: Specify if the data should be \"ratified\"")
+    print("       --rate-time: If rate is specified, change how long the rate is. default: 1s")
+    print("    -t --text: Prints the output to stdout instead of a plot")
     print("    -h --help: Displays this text")
 
 try:
@@ -53,8 +53,8 @@ if not (measurement and groups):
     usage()
     exit(1)
 
+keyValue = value.split(',')[0] # TODO fix to use all values
 
-keyValue = "f64" # TODO fix to use value
 
 # Create group string
 if rate:
@@ -73,10 +73,27 @@ except requests.exceptions.ConnectionError as error:
 
 result_tags = list(result.keys())
 
+keys = []
+
 for tag in result_tags:
     tag_only = tag[1]
-    tag_key = list(tag_only.keys())[0]
-    print("Getting data for " + str(tag_key) + " " +  str(tag_only[tag_key]))
+    tag_keys = list(tag_only.keys())
+    value_string = ""
+    tag_string = ""
+    print("Getting data for"),
+    for i, tag_key in enumerate(tag_keys):
+        tag_string += tag_key + ": " +  tag_only[tag_key]
+        value_string += tag_only[tag_key]
+
+        if tag_key not in keys:
+            keys.append(tag_key)
+
+        if (i + 1) < len(tag_keys):
+            tag_string += " and "
+            value_string += " and "
+
+    print(tag_string)
+
     get = list(result.get_points(tags=tag_only))
 
     x = []
@@ -85,8 +102,9 @@ for tag in result_tags:
         time = datetime.datetime.fromtimestamp(value['time'])
         x.append(time)
         y.append(value[keyValue])
+
     if graphic:
-        plt.plot(x, y, label=tag_only[tag_key])
+        plt.plot(x, y, label=value_string)
     else:
         print("\ttime\t\t\tvalue")
         print("---------------------------------------------")
@@ -94,8 +112,8 @@ for tag in result_tags:
             print (str(date) + "\t\t" + str(y[i]))
         print("")
 
-
 if graphic:
+    key_string = " and ".join(keys)
     plt.title("metric")
-    plt.legend(loc='best')
+    plt.legend(loc='best', title=key_string)
     plt.show()
