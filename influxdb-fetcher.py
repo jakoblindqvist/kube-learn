@@ -78,7 +78,7 @@ if rate:
     value = "derivative(sum(" + value +"), " + rateTime + ")"
     keyValue = "derivative"
 
-query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= 1529408612543ms AND time <= 1529411212321ms GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 1h"
+query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= now() - 3h GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 1h"
 #print("Querying using " + query)
 try:
     client = InfluxDBClient('localhost', 8086, 'prom', 'prom', 'prometheus')
