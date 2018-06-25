@@ -22,9 +22,10 @@ def usage():
     print("    -p --pickle: Use pickle to serialize the data and print to stdout")
     print("    -f --fill: Fill missing datapoints so all metrics have same amount of data")
     print("    -h --help: Displays this text")
+    print("    -s --smooth: Specify if the data should use a moving average")
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'hrtapfm:g:v:w:', ["help", "rate", "text", "array", "pickle", "fill", "measurement=", "group=", "value=", "rate-time=", "where="])
+    opts, args = getopt.getopt(sys.argv[1:], 'hrtapfm:g:v:w:s', ["help", "rate", "text", "array", "pickle", "fill", "measurement=", "group=", "value=", "rate-time=", "where=", "smooth"])
 except getopt.GetoptError as err:
     print(err)
     usage()
@@ -40,6 +41,7 @@ graphic = True
 array = False
 pickle = False
 fill = False
+smooth = False
 for o, a in opts:
     if o in ('-m', '--measurement'):
         measurement = a
@@ -61,6 +63,8 @@ for o, a in opts:
         fill = True
     elif o in ('-r', '--rate'):
         rate = True
+    elif o in ('-s', '--smooth'):
+        smooth = True
     elif o in ("-h", "--help"):
         usage()
         exit()
@@ -73,10 +77,19 @@ if not (measurement and groups):
 keyValue = value.split(',')[0] # TODO fix to use all values
 
 # Create group string
-if rate:
+if rate or smooth:
     groups = "time(" + rateTime + "), " + groups
+
+if rate:
     value = "derivative(sum(" + value +"), " + rateTime + ")"
     keyValue = "derivative"
+
+if smooth:
+    if rate:
+        value = "moving_average(" + value +", 5)"
+    else:
+        value = "moving_average(sum(" + value +"), 5)"
+    keyValue = "moving_average"
 
 query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= now() - 3h GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 1h"
 #print("Querying using " + query)
