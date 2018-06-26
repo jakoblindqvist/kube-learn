@@ -94,7 +94,8 @@ plt.imshow(Z, interpolation='nearest',
            cmap=plt.cm.Paired,
            aspect='auto', origin='lower')
 
-plt.plot(data[0], data[1], 'k.', markersize=2)
+#plt.plot(data[0], data[1], 'k.', markersize=2)
+plt.plot(reduced_data[:, 0], reduced_data[:, 1], 'k.', markersize=2)
 # Plot the centroids as a white X
 centroids = kmeans.cluster_centers_
 plt.scatter(centroids[:, 0], centroids[:, 1],

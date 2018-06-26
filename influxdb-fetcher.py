@@ -12,7 +12,9 @@ from influxdb import InfluxDBClient
 def usage():
     print("Usage: python " + sys.argv[0] + " -m <measurement> -g <group>")
     print("    -m --measurement: The measurement to fetch (required)")
-    print("    -g --group: Which tags to group by separaded by comma (required)")
+    print("    -g --group: Which tags to group by separated by comma (required)")
+    print("    -i --ip: The ip to the DB. default: localhost")
+    print("    -p --port: The port that the DB is using. default: 8086")
     print("    -v --value: The values to fetch. default: f64")
     print("    -w --where: To add to the where string")
     print("    -r --rate: Specify if the data should be \"ratified\"")
@@ -25,12 +27,14 @@ def usage():
     print("    -s --smooth: Specify if the data should use a moving average")
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'hrtapfm:g:v:w:s', ["help", "rate", "text", "array", "pickle", "fill", "measurement=", "group=", "value=", "rate-time=", "where=", "smooth"])
+    opts, args = getopt.getopt(sys.argv[1:], 'hrtapfm:g:v:w:i:p:s', ["help", "rate", "text", "array", "pickle", "fill", "measurement=", "group=", "value=", "rate-time=", "where=", "ip=", "port=", "smooth"])
 except getopt.GetoptError as err:
     print(err)
     usage()
     sys.exit(1)
 
+ip= "localhost"
+port=8086
 measurement = ""
 groups = ""
 value = "f64"
@@ -47,6 +51,10 @@ for o, a in opts:
         measurement = a
     elif o in ('-g', '--group'):
         groups = a
+    elif o in ('-i', '--ip'):
+        ip = a
+    elif o in ('-p', '--port'):
+        port = int(a)
     elif o in ('-v', '--value'):
         value = a
     elif o in ('-w', '--where'):
@@ -91,10 +99,10 @@ if smooth:
         value = "moving_average(sum(" + value +"), 5)"
     keyValue = "moving_average"
 
-query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= now() - 3h GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 1h"
+query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= now() - 3h GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 3h"
 #print("Querying using " + query)
 try:
-    client = InfluxDBClient('localhost', 8086, 'prom', 'prom', 'prometheus')
+    client = InfluxDBClient(ip, port, 'prom', 'prom', 'prometheus')
     result = client.query(query, epoch='s')
 except requests.exceptions.ConnectionError as error:
     print >> sys.stderr, ("Error connecting to database")
