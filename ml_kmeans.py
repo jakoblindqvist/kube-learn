@@ -22,7 +22,7 @@ except getopt.GetoptError as err:
     sys.exit(1)
 
 input = ""
-clusters = 2
+clusters = 3
 for o, a in opts:
     if o in ('-i', '--input'):
         input = a
@@ -32,11 +32,14 @@ for o, a in opts:
         usage()
         exit()
 
-if input:
-    with open(input) as file:
-        X = load(file)
-else:
-    X = load(sys.stdin)
+#if input:
+#    with open(input) as file:
+#        X = load(file)
+#else:
+#    X = load(sys.stdin)
+
+X = [[1], [0.9994394618834082], [0.9994363021420518], [0.9994435169727324], [0.9989067055393587], [1], [1], [1], [1], [1], [1], [0.9955599407992107], [0.9938335046248715], [0.9966471081307627], [0.9985412107950401], [0.9997293640054127], [1], [0.9996900185988841], [0.9995883079456567], [1], [1], [1], [1], [0.999485596707819], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [1], [0.999721293199554], [0.9997066588442359], [0.9994347088750706], [1], [0.9951338199513382], [0.9962740633409232], [0.997649271274095], [0.9986191659762497], [0.9994361432196223], [0.9994370954123276]]
+y = [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1]
 
 data = []
 for i,_ in enumerate(X[0]):
@@ -44,30 +47,28 @@ for i,_ in enumerate(X[0]):
 
 #print data
 
-min_X = sys.maxint
-max_X = 0
-min_Y = sys.maxint
-max_Y = 0
+#min_X = sys.maxint
+#max_X = 0
+#min_Y = sys.maxint
+#max_Y = 0
 
-for i, value in enumerate(data[0]):
-    value2 = data[1][i]
+#for i, value in enumerate(data[0]):
+#    value2 = data[1][i]
 
-    if value < min_X:
-        min_X = value
-    if value > max_X:
-        max_X = value
-    if value2 < min_Y:
-        min_Y = value2
-    if value2 > max_Y:
-        max_Y = value2
+#    if value < min_X:
+#        min_X = value
+#    if value > max_X:
+#        max_X = value
+#    if value2 < min_Y:
+#        min_Y = value2
+#    if value2 > max_Y:
+#        max_Y = value2
 
     #X.append([value, value2])
 
-
-
 data = MinMaxScaler().fit_transform(X)
 
-reduced_data = PCA(n_components=2).fit_transform(data)
+reduced_data = PCA(n_components=1).fit_transform(data)
 
 kmeans = KMeans(init='k-means++', n_clusters=2, n_init=10)
 #kmeans.fit(reduced_data)
@@ -95,7 +96,15 @@ plt.imshow(Z, interpolation='nearest',
            aspect='auto', origin='lower')
 
 #plt.plot(data[0], data[1], 'k.', markersize=2)
-plt.plot(reduced_data[:, 0], reduced_data[:, 1], 'k.', markersize=2)
+for i, label in enumerate(y):
+    if label == 0:
+        color = "ro"
+    elif label == 1:
+        color = "go"
+    elif label == 2:
+        color = "bo"
+
+    plt.plot(reduced_data[i, 0], reduced_data[i, 1], color, markersize=4)
 # Plot the centroids as a white X
 centroids = kmeans.cluster_centers_
 plt.scatter(centroids[:, 0], centroids[:, 1],

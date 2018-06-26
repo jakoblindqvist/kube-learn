@@ -21,13 +21,13 @@ def usage():
     print("       --rate-time: If rate is specified, change how long the rate is. default: 1s")
     print("    -t --text: Prints the output to stdout instead of a plot")
     print("    -a --array: Prints the output as an python array")
-    print("    -p --pickle: Use pickle to serialize the data and print to stdout")
+    print("       --pickle: Use pickle to serialize the data and print to stdout")
     print("    -f --fill: Fill missing datapoints so all metrics have same amount of data")
     print("    -h --help: Displays this text")
     print("    -s --smooth: Specify if the data should use a moving average")
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'hrtapfm:g:v:w:i:p:s', ["help", "rate", "text", "array", "pickle", "fill", "measurement=", "group=", "value=", "rate-time=", "where=", "ip=", "port=", "smooth"])
+    opts, args = getopt.getopt(sys.argv[1:], 'hrtafm:g:v:w:i:p:s', ["help", "rate", "text", "array", "pickle", "fill", "measurement=", "group=", "value=", "rate-time=", "where=", "ip=", "port=", "smooth"])
 except getopt.GetoptError as err:
     print(err)
     usage()
@@ -59,13 +59,13 @@ for o, a in opts:
         value = a
     elif o in ('-w', '--where'):
         whereAdd = a
-    elif o == 'rate-time':
+    elif o == '--rate-time':
         rateTime = a
     elif o in ('-t', '--text'):
         graphic = False
     elif o in ('-a', '--array'):
         array = True
-    elif o in ('-p', '--pickle'):
+    elif o == '--pickle':
         pickle = True
     elif o in ('-f', '--fill'):
         fill = True
@@ -99,11 +99,11 @@ if smooth:
         value = "moving_average(sum(" + value +"), 5)"
     keyValue = "moving_average"
 
-query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= now() - 3h GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 3h"
+query = "SELECT " + value + " FROM \"_\" WHERE (\"__name__\" = \'" + measurement + "\' " + whereAdd + ") AND time >= 1530001778000ms and time <= 1530003254000ms GROUP BY " + groups # TODO Change "time >= 1529408612543ms AND time <= 1529411212321ms" to "time >= now() - 3h"
 #print("Querying using " + query)
 try:
     client = InfluxDBClient(ip, port, 'prom', 'prom', 'prometheus')
-    result = client.query(query, epoch='s')
+    result = client.query(query, epoch='ms')
 except requests.exceptions.ConnectionError as error:
     print >> sys.stderr, ("Error connecting to database")
     exit(1)
@@ -155,6 +155,30 @@ if fill:
                     other[1].append(0)
                     other[0], other[1] = (list(t) for t in zip(*sorted(zip(other[0], other[1]))))
 
+with open("../kube-insight-manifests/load-test/output/2018-06-26_08-29-38.labels", "r") as file:
+    labels = file.read()
+
+#print values
+
+#labels = [[1530001778, 'middle'], [1530001893, 'low'], [1530002102, 'high'], [1530002192, 'middle'], [1530002305, 'low'], [1530002514, 'low'], [1530002722, 'low'], [1530002931, 'middle'], [1530003049, 'high'], [1530003138, 'middle']]
+
+data_label = [0] * len(values[0][0])
+for label in labels:
+    time = datetime.datetime.fromtimestamp(label[0])
+    level = label[1]
+    for i, data_time in enumerate(values[0][0]):
+        if time <= data_time:
+            if level == 'high':
+                data_label[i] = 2
+            elif level == 'middle':
+                data_label[i] = 1
+            elif level == 'low':
+                data_label[i] = 0
+
+#print data_label
+
+#print len(values[0][0])
+
 if graphic:
     for value in values:
         plt.plot(value[0], value[1], label=value_string)
@@ -168,6 +192,7 @@ else:
         for i,_ in enumerate(values[0][0]):
             tmp = []
             for value in values:
+                #print len(value[0])
                 tmp.append(value[1][i])
             dumper.append(tmp)
 
