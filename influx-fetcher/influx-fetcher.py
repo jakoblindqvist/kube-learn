@@ -50,7 +50,12 @@ def get_value_string(flags):
 
 
 def get_where_string(name, flags, times):
-    where = "(\"__name__\" = '" + name + "')"
+    if name[0] == '/' and name[-1] == '/':
+        where = "(\"__name__\" =~ " + name + ")"
+    else:
+        where = "(\"__name__\" = '" + name + "')"
+
+
 
     for where_entry in flags['where']:
         where += " AND (" + where_entry + ")"
