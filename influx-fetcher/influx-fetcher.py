@@ -142,13 +142,18 @@ def get_metrics(query_configs, influx_config):
 
     for metric_config in query_configs['metrics']:
         norm = False
+        fill = False
         if is_dict_key_set(metric_config, 'flags'):
             if is_dict_key_set(metric_config['flags'], 'normalize'):
                 norm = True
+            if is_dict_key_set(metric_config['flags'], 'fill'):
+                fill = True
 
         query = generate_query(metric_config, query_configs['times'])
         query_result = execute_query(client, query)
         result, label = process_query_result(query_result)
+        if fill:
+            result = fill_edges(result)
         if norm:
             result = normalize_data(result)
         data += result
@@ -187,6 +192,42 @@ def normalize_data(data):
 """
     TODO
 """
+def fill_edges(data):
+    # For all values
+    for value in data:
+        start = True
+        start_last_index = 0
+        stop_first_index = len(value[1])
+        for i, entry in enumerate(value[1]):
+            # Find fist value
+            if start and entry == None:
+                start_last_index = i
+            else:
+                start = False
+            # Find last value
+            if not start and entry == None:
+                stop_first_index = i
+                break
+
+        if start_last_index != 0:
+            # Fill all entries before first value
+            start_value = value[1][start_last_index + 1]
+            print "Filling 0 to", start_last_index, "with", start_value
+            for i in range(start_last_index + 1):
+                value[1][i] = start_value
+
+        if stop_first_index != len(value[1]):
+            # Fill all entries after last value
+            stop_value = value[1][stop_first_index - 1]
+            print "Filling ", stop_first_index, " to ", len(value[1]), "with", stop_value
+            for i in range(stop_first_index, len(value[1])):
+                value[1][i] = stop_value
+
+    return data
+
+"""
+    TODO
+"""
 def process_query_result(query_result):
     result_tags = list(query_result.keys())
 
@@ -218,7 +259,7 @@ def process_query_result(query_result):
             data.append(value['data_value'])
 
         values.append([time, data])
-        labels.append([value_string, tag_string])
+        labels.append(tag_string)
     return values, labels
 
 
