@@ -175,8 +175,6 @@ def normalize_data(data):
             if abs(value) > max_abs_value:
                 max_abs_value = float(abs(value))
 
-    print max_abs_value
-
     for values in data:
         norm_data = []
         for value in values[1]:
