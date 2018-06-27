@@ -6,24 +6,32 @@ from datetime import datetime
 """
     Class to store influxDB configuration
 """
+
+
 class InfluxConfig:
-    def __init__(self, ip = "localhost", port = 8086, user = "prom", password = "prom", db = "prometheus"):
+    def __init__(self, ip="localhost", port=8086, user="prom", password="prom", db="prometheus"):
         self.ip = ip
         self.port = port
         self.user = user
         self.password = password
         self.db = db
 
+
 """
     Executes a query and return the result
 """
+
+
 def execute_query(client, query):
     print "Querying: " + query
     return client.query(query, epoch='s')
 
+
 """
     Creates the SELECT part of the query
 """
+
+
 def get_value_string(flags):
     value = "mean(\"f64\")"
 
@@ -35,26 +43,32 @@ def get_value_string(flags):
 
     return value
 
+
 """
     Create the WHERE part of the query
 """
-def get_where_string(name, flags):
+
+
+def get_where_string(name, flags, times):
     where = "(\"__name__\" = '" + name + "')"
 
     for where_entry in flags['where']:
         where += " AND (" + where_entry + ")"
 
-    if flags['startTime']:
-        where += " AND (time >= " + flags['startTime'] + ")"
+    if is_dict_key_set(times, 'startTime'):
+        where += " AND (time >= " + times['startTime'] + ")"
 
-    if flags['stopTime']:
-        where += " AND (time <= " + flags['stopTime']+ ")"
+    if is_dict_key_set(times, 'stopTime'):
+        where += " AND (time <= " + times['stopTime'] + ")"
 
     return where
+
 
 """
     Create the GROUP BY part of the query
 """
+
+
 def get_group_string(flags):
     group = "time(1s)"
 
@@ -63,11 +77,17 @@ def get_group_string(flags):
 
     return group + " fill(linear)"
 
+
 """
     Generates the influxDB query from the measure info that can be executed
 """
-def generate_query(metric):
-    name = metric['name']
+
+
+def generate_query(metric, times):
+    if is_dict_key_set(metric, 'name'):
+        name = metric['name']
+    else:
+        raise ValueError("Needs to have a name")
 
     # Default flags
     flags = {
@@ -76,24 +96,24 @@ def generate_query(metric):
         'where': [],
         'group': [],
         'smooth': False,
-        'smoothLevel': 5,
-        'startTime': "",
-        'stopTime': "",
+        'smoothLevel': 5
     }
-
 
     for key in metric['flags'].keys():
         if key in flags:
             flags[key] = metric['flags'][key]
 
     value = get_value_string(flags)
-    where = get_where_string(name, flags)
+    where = get_where_string(name, flags, times)
     group = get_group_string(flags)
     return "SELECT " + value + " AS \"data_value\" FROM \"_\" WHERE (" + where + ") GROUP BY " + group
+
 
 """
     Creates a DB client that can be used to execute a query
 """
+
+
 def get_DB_client(ip, port, user, password, db):
     try:
         client = InfluxDBClient(ip, port, user, password, db)
@@ -103,17 +123,34 @@ def get_DB_client(ip, port, user, password, db):
 
     return client
 
+def is_dict_key_set(dict, test_key):
+    return (test_key in dict and dict[test_key])
 """
 
 """
-def get_metrics(metrics, influx_config):
-    client = get_DB_client(influx_config.ip, influx_config.port, influx_config.user, influx_config.password, influx_config.db)
+def get_metrics(query_configs, influx_config):
+    client = get_DB_client(influx_config.ip, influx_config.port,
+                           influx_config.user, influx_config.password, influx_config.db)
     data = []
     labels = []
-    for metric in metrics:
-        query = generate_query(metric)
+    norm = False
+    if not is_dict_key_set(query_configs, 'metrics'):
+        raise ValueError("Query config needs to have some metrics")
+
+    if not is_dict_key_set(query_configs, 'times'):
+        query_configs['times'] = {}
+
+    for metric_config in query_configs['metrics']:
+        norm = False
+        if is_dict_key_set(metric_config, 'flags'):
+            if is_dict_key_set(metric_config['flags'], 'normalize'):
+                norm = True
+
+        query = generate_query(metric_config, query_configs['times'])
         query_result = execute_query(client, query)
         result, label = process_query_result(query_result)
+        if norm:
+            result = normalize_data(result)
         data += result
         labels += label
 
@@ -129,6 +166,28 @@ def get_metrics(metrics, influx_config):
     }
 
 """
+    TODO
+"""
+def normalize_data(data):
+    max_abs_value = 0
+    for values in data:
+        for value in values[1]:
+            if abs(value) > max_abs_value:
+                max_abs_value = float(abs(value))
+
+    print max_abs_value
+
+    for values in data:
+        norm_data = []
+        for value in values[1]:
+            normalized = value / max_abs_value
+            norm_data.append(normalized)
+        values[1] = norm_data
+
+    return data
+
+"""
+    TODO
 """
 def process_query_result(query_result):
     result_tags = list(query_result.keys())
@@ -142,7 +201,7 @@ def process_query_result(query_result):
         value_string = ""
         tag_string = ""
         for i, tag_key in enumerate(tag_keys):
-            tag_string += tag_key + ": " +  tag_only[tag_key]
+            tag_string += tag_key + ": " + tag_only[tag_key]
             value_string += tag_only[tag_key]
 
             if tag_key not in keys:
@@ -165,24 +224,9 @@ def process_query_result(query_result):
     return values, labels
 
 
-
 """
     TODO
 """
-#def fill_holes(data):
-#    #Fill missing values
-#    for value in data:
-#        # For all data
-#        for time in value[0]:
-#            # For all times in data
-#            for other_value in data:
-#                # For all other data
-#                if not time in other_value[0]:
-#                    other_value[0].append(time)
-#                    other_value[1].append(0)
-#                    other_value[0], other_value[1] = (list(t) for t in zip(*sorted(zip(other_value[0], other_value[1]))))
-#    return data
-
 def trim_edges(data):
     result = []
 
@@ -211,6 +255,7 @@ def trim_edges(data):
 
     return result
 
+
 """
     TODO
 """
@@ -225,22 +270,34 @@ def reorder_data(data):
         time.append(value[0][i])
     return result, time
 
+
 def main():
-    conf = InfluxConfig(ip = "192.168.104.186")
-    metric = [
-        {
-            'name': 'node_cpu',
-            'flags': {
-                'rate': True,
-                'group': ["instance"],
-                'startTime': "now() - 2m"
+    conf = InfluxConfig(ip="192.168.104.186")
+    metric = {
+        'metrics': [
+            {
+                'name': 'node_cpu',
+                'flags': {
+                    'rate': True,
+                    'group': ["instance"]
+                }
+            }, {
+                'name': 'istio_request_count',
+                'flags': {
+                    'rate': True,
+                    'group': ["destination_service", "source_service"],
+                    'normalize': True
+                }
             }
+        ],
+        'times': {
+            'startTime': "now() - 2m"
         }
-    ]
+    }
     print get_metrics(metric, conf)
     #get_metrics(metric, conf)
 
     return 0
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()
