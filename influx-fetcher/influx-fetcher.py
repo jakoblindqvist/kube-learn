@@ -212,14 +212,12 @@ def fill_edges(data):
         if start_last_index != 0:
             # Fill all entries before first value
             start_value = value[1][start_last_index + 1]
-            print "Filling 0 to", start_last_index, "with", start_value
             for i in range(start_last_index + 1):
                 value[1][i] = start_value
 
         if stop_first_index != len(value[1]):
             # Fill all entries after last value
             stop_value = value[1][stop_first_index - 1]
-            print "Filling ", stop_first_index, " to ", len(value[1]), "with", stop_value
             for i in range(stop_first_index, len(value[1])):
                 value[1][i] = stop_value
 
