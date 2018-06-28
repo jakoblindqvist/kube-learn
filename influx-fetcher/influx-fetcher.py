@@ -1,7 +1,8 @@
 from influxdb import InfluxDBClient
 import sys
 from requests.exceptions import ConnectionError
-from datetime import datetime
+from datetime import datetime, timedelta
+import re
 
 """
     Class to store influxDB configuration
@@ -46,11 +47,17 @@ def execute_query(client, query):
 def get_value_string(flags):
     value = "mean(\"f64\")"
 
+    if flags['rate'] and flags['nonNegRate']:
+        raise ValueError("Cannot have both rate and nonNegRate set")
+
     if flags['rate']:
         value = "derivative(mean(\"f64\"), " + flags['rateTime'] + ")"
 
+    if flags['nonNegRate']:
+        value = "non_negative_derivative(mean(\"f64\"), " + flags['rateTime'] + ")"
+
     if flags['smooth']:
-        value = "moving_average(" + value + ", " + flags['smoothLevel'] + ")"
+        value = "moving_average(" + value + ", " + str(flags['smoothLevel']) + ")"
 
     return value
 
@@ -81,8 +88,8 @@ def get_where_string(name, flags, times):
 """
     Create the GROUP BY part of the query
 """
-def get_group_string(flags):
-    group = "time(1s)"
+def get_group_string(flags, groupTime):
+    group = "time(" + groupTime + ")"
 
     for group_entry in flags['group']:
         group += ", " + group_entry
@@ -93,7 +100,7 @@ def get_group_string(flags):
 """
     Generates the influxDB query from the measure info that can be executed
 """
-def generate_query(metric, times):
+def generate_query(metric, times, groupTime):
     if is_dict_key_set(metric, 'name'):
         name = metric['name']
     else:
@@ -102,6 +109,7 @@ def generate_query(metric, times):
     # Default flags
     flags = {
         'rate': False,
+        'nonNegRate': False,
         'rateTime': "1s",
         'where': [],
         'group': [],
@@ -115,7 +123,7 @@ def generate_query(metric, times):
 
     value = get_value_string(flags)
     where = get_where_string(name, flags, times)
-    group = get_group_string(flags)
+    group = get_group_string(flags, groupTime)
     return "SELECT " + value + " AS \"data_value\" FROM \"_\" WHERE (" + where + ") GROUP BY " + group
 
 
@@ -227,6 +235,9 @@ def trim_edges(data):
         if time_data[0][-1] < earliest_stop_time:
             earliest_stop_time = time_data[0][-1]
 
+    if latest_start_time >= earliest_stop_time:
+        raise ValueError("Measures don't overlap")
+
     # Trim edges so all data starts and stops on same time
     for time_data in data:
         new_data = []
@@ -240,6 +251,71 @@ def trim_edges(data):
 
     return result
 
+def fill_missing_values(data, groupTime):
+    day_match = re.match(r"(\d+)d", groupTime)
+    hour_match = re.match(r"(\d+)h", groupTime)
+    minute_match = re.match(r"(\d+)m?($|\d)", groupTime)
+    second_match = re.match(r"(\d+)s", groupTime)
+    ms_match = re.match(r"(\d+)ms", groupTime)
+
+    days = 0
+    hours = 0
+    minutes = 0
+    seconds = 0
+    ms = 0
+
+    if day_match:
+        days = int(day_match.group(1))
+    if hour_match:
+        hours = int(hour_match.group(1))
+    if minute_match:
+        minutes = int(minute_match.group(1))
+    if second_match:
+        seconds = int(second_match.group(1))
+    if ms_match:
+        ms = int(ms_match.group(1))
+
+    # Find lastest start and earliest stop
+    earliest_start_time = datetime.now()
+    latest_stop_time = data[0][0][0]
+    for time_data in data:
+        if time_data[0][0] < earliest_start_time:
+            earliest_start_time = time_data[0][0]
+        if time_data[0][-1] > latest_stop_time:
+            latest_stop_time = time_data[0][-1]
+
+    # For all values
+    for time_value in data:
+        # Fill values so it starts on earliest start time
+        start_value = time_value[1][0]
+        while time_value[0][0] > earliest_start_time:
+            previous_time = time_value[0][0]
+            time_value[0].insert(0, previous_time - timedelta(days = days, hours = hours, minutes = minutes, seconds = seconds, milliseconds = ms))
+            time_value[1].insert(0, start_value)
+        # Fill values so it stops on latest stop time
+        stop_value = time_value[1][-1]
+        while time_value[0][-1] < latest_stop_time:
+            previous_time = time_value[0][-1]
+            time_value[0].append(previous_time + timedelta(days = days, hours = hours, minutes = minutes, seconds = seconds, milliseconds = ms))
+            time_value[1].append(stop_value)
+
+    # For all values
+    for time_value in data:
+        current_time = earliest_start_time
+        last_value = 0
+        current_index = 0
+        while current_time <= latest_stop_time:
+            if current_time in time_value[0]:
+                current_index = time_value[0].index(current_time)
+                last_value = time_value[1][current_index]
+            else:
+                current_index += 1
+                time_value[0].insert(current_index, current_time)
+                time_value[1].insert(current_index, last_value)
+
+            current_time += timedelta(days = days, hours = hours, minutes = minutes, seconds = seconds, milliseconds = ms)
+
+    return data
 
 """
     Reorders the data from:
@@ -288,6 +364,9 @@ def get_metrics(query_configs, influx_config):
     if not is_dict_key_set(query_configs, 'times'):
         query_configs['times'] = {}
 
+    if not is_dict_key_set(query_configs, 'groupTime'):
+        query_configs['groupTime'] = "1s"
+
     for metric_config in query_configs['metrics']:
         norm = False
         fill = False
@@ -297,7 +376,7 @@ def get_metrics(query_configs, influx_config):
             if is_dict_key_set(metric_config['flags'], 'fill'):
                 fill = True
 
-        query = generate_query(metric_config, query_configs['times'])
+        query = generate_query(metric_config, query_configs['times'], query_configs['groupTime'])
         query_result = execute_query(client, query)
         result, label = process_query_result(query_result)
         if fill:
@@ -307,8 +386,19 @@ def get_metrics(query_configs, influx_config):
         data += result
         labels += label
 
+    print "Merging data"
+
+    before = len(data[0][0])
+
+    data = fill_missing_values(data, query_configs['groupTime'])
+    print "Lost %d%% of data" % ((before - len(data[0][0])) / float(before) * 100)
+
     data = trim_edges(data)
     metrics, times = reorder_data(data)
+
+    if len(metrics) == 0:
+        print ""
+        print "WARNING: no data was fetched"
 
     return {
         'data': metrics,
@@ -318,3 +408,43 @@ def get_metrics(query_configs, influx_config):
 
 if __name__ == '__main__':
     print "Influx fetcher loaded"
+
+""" conf = InfluxConfig(ip = "192.168.104.186")
+metric = {
+    'metrics': [
+                    {
+                        'name': 'node_cpu_norm',
+                        'flags': {
+                            'rate': True,
+                            'rateTime': "1m",
+                            'group': ["instance"],
+                        },
+                    },
+                    {
+                        'name': '/envoy_cluster_inbound_\d+__.*_sock_shop_svc_cluster_local_upstream_cx_connect_ms/',
+                        'flags': {
+                            'group': ["__name__"],
+                            'nonNegRate': True,
+                            'rateTime': "1m",
+                            'normalize': True
+                        }
+                    },
+                    {
+                        'name': 'istio_request_count',
+                        'flags': {
+                            'nonNegRate': True,
+                            'rateTime': "1m",
+                            'group': ["destination_service", "source_service"],
+                            'normalize': True,
+                            'where': ["\"destination_service\" !~ /metrics\.svc/"]
+                        }
+                    }
+                ],
+    'times': {
+        'startTime': "1530111004s",
+        'stopTime':  "1530165650s"
+    },
+    'groupTime': "1m"
+}
+
+get_metrics(metric, conf) """
