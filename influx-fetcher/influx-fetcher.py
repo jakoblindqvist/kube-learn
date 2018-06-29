@@ -254,7 +254,7 @@ def trim_edges(data):
 def fill_missing_values(data, groupTime):
     day_match = re.match(r"(\d+)d", groupTime)
     hour_match = re.match(r"(\d+)h", groupTime)
-    minute_match = re.match(r"(\d+)m?($|\d)", groupTime)
+    minute_match = re.match(r"(\d+)m($|\d)", groupTime)
     second_match = re.match(r"(\d+)s", groupTime)
     ms_match = re.match(r"(\d+)ms", groupTime)
 
@@ -307,7 +307,10 @@ def fill_missing_values(data, groupTime):
         while current_time <= latest_stop_time:
             if current_time in time_value[0]:
                 current_index = time_value[0].index(current_time)
-                last_value = time_value[1][current_index]
+                if time_value[1][current_index] == None:
+                    time_value[1][current_index] = last_value
+                else:
+                    last_value = time_value[1][current_index]
             else:
                 current_index += 1
                 time_value[0].insert(current_index, current_time)
@@ -341,9 +344,13 @@ def fill_missing_values(data, groupTime):
 def reorder_data(data):
     result = []
     time = []
-    for i in range(len(data[0][0])):
+    first_length = len(data[0][0])
+
+    for i in range(first_length):
         new_value = []
         for time_value in data:
+            if len(time_value[0]) != first_length:
+                raise ValueError("Measurements aren't the same lengths")
             new_value.append(time_value[1][i])
         result.append(new_value)
         time.append(data[0][0][i])
@@ -379,6 +386,7 @@ def get_metrics(query_configs, influx_config):
         query = generate_query(metric_config, query_configs['times'], query_configs['groupTime'])
         query_result = execute_query(client, query)
         result, label = process_query_result(query_result)
+        label = [metric_config['name'] + ": " + s for s in label]
         if fill:
             result = fill_edges(result)
         if norm:
@@ -391,9 +399,10 @@ def get_metrics(query_configs, influx_config):
     before = len(data[0][0])
 
     data = fill_missing_values(data, query_configs['groupTime'])
+    data = trim_edges(data)
+
     print "Lost %d%% of data" % ((before - len(data[0][0])) / float(before) * 100)
 
-    data = trim_edges(data)
     metrics, times = reorder_data(data)
 
     if len(metrics) == 0:
