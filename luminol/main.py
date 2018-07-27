@@ -114,7 +114,7 @@ def main():
         plt.scatter(xcoords, ycoords, c='r')
 
     # Display the plot with metrics and anomalies
-    # plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':
