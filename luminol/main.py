@@ -3,11 +3,9 @@
 from __future__ import print_function
 import json
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import sys
-from influx_fetcher import *
 from luminol import anomaly_detector as ad
+import influx_fetcher
 
 
 def read_csv(path):
@@ -22,10 +20,10 @@ def read_csv(path):
 
 def prepare_data(data):
     """Prepare the data"""
-    #data['y'] = np.log(data['y'])
-    # for column in data:
-    #     data[column] = np.log(data[column])
+    # data['y'] = np.log(data['y'])
     # data = data.resample('10S').mean()
+    # for feature_name in data:
+    #     data[feature_name] = np.log(data[feature_name])
     data = data.dropna()
     # data['ds'] = data.index
     return data
@@ -35,11 +33,8 @@ def find_anomalies(data):
     """Run luminol and find anomalies"""
     points = {}
     i = 0
-    # for _, row, _ in data.itertuples():
-    #     points[i] = row
-    #     i += 1
-    for row in data.itertuples():
-        points[i] = row[1]
+    for point in data:
+        points[i] = point
         i += 1
     detector = ad.AnomalyDetector(points,
                                   algorithm_name='default_detector')
@@ -60,6 +55,17 @@ def get_anomaly_index(anomalies):
 
 
 def influx_to_dataframe(data):
+    """Converts influxdb metrics to a pandas dataframe"""
+    # res = {}
+    # for feature in data['feature_names']:
+    #     res[feature] = []
+
+    # for series in data['data']:
+    #     for pair in zip(data['feature_names'], series):
+    #         res[pair[0]].append(pair[1])
+
+    # data = pd.DataFrame(data=res, index=data['times'])
+
     data = pd.DataFrame(data=data['data'],
                         index=data['times'],
                         columns=data['feature_names'])
@@ -70,56 +76,44 @@ def main():
     """Read data from csv-file and plot anomalies using luminol"""
 
     # Get metrics from influx
-    conf = InfluxConfig(ip = '212.32.186.84')
+    conf = influx_fetcher.InfluxConfig(ip='212.32.186.84')
     with open('metrics.json') as file_handle:
         query = json.load(file_handle)
-    data = get_metrics(query, conf)
+    data = influx_fetcher.get_metrics(query, conf)
 
     # Prepare data
+    times = data['times']
+    feature_names = data['feature_names']
     data = influx_to_dataframe(data)
     data = prepare_data(data)
 
     # Find anomalies
-    anomalies = find_anomalies(data)
-    points = get_anomaly_index(anomalies)
+    anomalies = []
+    for feature_name in data:
+        series = data[feature_name]
+        anomalies.append(find_anomalies(series))
 
-    # Plot data and anomalies
+    anomaly_coordinates = []
+    for anomaly in anomalies:
+        anomaly_coordinates.append(get_anomaly_index(anomaly))
+    anomaly_coordinates = zip(feature_names, anomaly_coordinates)
+
+    # Plot the metrics
     data.plot()
-    plt.show()
-    
-    # xcoords = []
-    # ycoords = []
-    # for point in points:
-    #     ycoords.append(data['times'][point])
-    #     xcoords.append(data['data']['master'][point])
 
-    # data.plot()
-    # plt.show()
+    # Plot the anomalies
+    print(anomaly_coordinates)
+    for anomaly in anomaly_coordinates:
+        feature_name = anomaly[0]
+        indexes = anomaly[1]
+        xcoords = []
+        ycoords = []
+        for index in indexes:
+            xcoords.append(times[index])
+            ycoords.append(data[feature_name][index])
+        plt.scatter(xcoords, ycoords, c='r')
 
-    # # read csv path from cli
-    # if(len(sys.argv) != 2):
-    #     print("usage: python main.py <path-to-csv>", file=sys.stderr)
-    #     sys.exit(1)
-    # csv_path = sys.argv[1]
-
-    # # read data from csv
-    # data = read_csv(csv_path)
-    # data = prepare_data(data)
-
-    # # find anomalies
-    # anomalies = find_anomalies(data)
-    # points = get_anomaly_index(anomalies)
-
-    # # convert luminol's anomalies into coordinates
-    # xcoords = []
-    # ycoords = []
-    # for point in points:
-    #     ycoords.append(data['y'][point])
-    #     xcoords.append(data['ds'][point])
-
-    # # plot result
-    # data.plot(x='ds', y='y')
-    # plt.scatter(xcoords, ycoords, c='r')
+    # Display the plot with metrics and anomalies
     # plt.show()
 
 

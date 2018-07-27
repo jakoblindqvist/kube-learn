@@ -7,7 +7,17 @@
                 "group": ["instance"],
                 "fill": true,
                 "smooth": true,
-                "smoothLevel": "10"
+                "smoothLevel": "5"
+            }
+        },
+        {
+            "name": "istio_request_rate",
+            "flags": {
+                "rate": true,
+                "group": ["instance"],
+                "fill": true,
+                "smooth": true,
+                "smoothLevel": "5"
             }
         }
     ],
