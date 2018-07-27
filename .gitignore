@@ -1,1 +1,7 @@
 **/*.swp
+
+**/*.csv
+
+# python
+**/__pycache__/**
+**/*.pyc
