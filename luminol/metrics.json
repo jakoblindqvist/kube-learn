@@ -11,18 +11,19 @@
             }
         },
         {
-            "name": "istio_request_rate",
+            "name": "istio_request_count",
             "flags": {
                 "rate": true,
                 "group": ["instance"],
                 "fill": true,
                 "smooth": true,
-                "smoothLevel": "5"
+                "smoothLevel": "5",
+                "normalize": true
             }
         }
     ],
     "times": {
         "startTime": "now() - 1h",
         "stopTime": "now() - 0h"
+        }
     }
-}

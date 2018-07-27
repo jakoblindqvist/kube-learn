@@ -71,6 +71,9 @@ def influx_to_dataframe(data):
                         columns=data['feature_names'])
     return data
 
+def pca_reduce(data):
+    pass
+
 
 def main():
     """Read data from csv-file and plot anomalies using luminol"""
@@ -86,6 +89,11 @@ def main():
     feature_names = data['feature_names']
     data = influx_to_dataframe(data)
     data = prepare_data(data)
+
+    # Process data using PCA
+    data = pca_reduce(data)
+    
+    print(data.head())
 
     # Find anomalies
     anomalies = []
