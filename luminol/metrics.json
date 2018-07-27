@@ -1,0 +1,18 @@
+{
+    "metrics": [
+        {
+            "name": "node_cpu_norm",
+            "flags": {
+                "rate": false,
+                "group": ["instance"],
+                "fill": true,
+                "smooth": true,
+                "smoothLevel": "10"
+            }
+        }
+    ],
+    "times": {
+        "startTime": "now() - 1h",
+        "stopTime": "now() - 0h"
+    }
+}
