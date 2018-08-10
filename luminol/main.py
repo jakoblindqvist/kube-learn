@@ -20,12 +20,7 @@ def read_csv(path):
 
 def prepare_data(data):
     """Prepare the data"""
-    # data['y'] = np.log(data['y'])
-    # data = data.resample('10S').mean()
-    # for feature_name in data:
-    #     data[feature_name] = np.log(data[feature_name])
     data = data.dropna()
-    # data['ds'] = data.index
     return data
 
 
@@ -45,10 +40,6 @@ def find_anomalies(data):
 def get_anomaly_index(anomalies):
     """Return indexes for luminol anomalies"""
     points = []
-    # for anomaly in anomalies:
-    #     window = anomaly.get_time_window()
-    #     for point in range(window[0], window[1]):
-    #         points.append(point)
     for anomaly in anomalies:
         points.append(anomaly.exact_timestamp)
     return points
@@ -56,30 +47,22 @@ def get_anomaly_index(anomalies):
 
 def influx_to_dataframe(data):
     """Converts influxdb metrics to a pandas dataframe"""
-    # res = {}
-    # for feature in data['feature_names']:
-    #     res[feature] = []
-
-    # for series in data['data']:
-    #     for pair in zip(data['feature_names'], series):
-    #         res[pair[0]].append(pair[1])
-
-    # data = pd.DataFrame(data=res, index=data['times'])
-
     data = pd.DataFrame(data=data['data'],
                         index=data['times'],
                         columns=data['feature_names'])
     return data
 
+
 def pca_reduce(data):
-    pass
+    """pca_reduce"""
+    return data
 
 
 def main():
     """Read data from csv-file and plot anomalies using luminol"""
 
     # Get metrics from influx
-    conf = influx_fetcher.InfluxConfig(ip='212.32.186.84')
+    conf = influx_fetcher.InfluxConfig(ip='212.32.186.86')
     with open('metrics.json') as file_handle:
         query = json.load(file_handle)
     data = influx_fetcher.get_metrics(query, conf)
@@ -90,10 +73,8 @@ def main():
     data = influx_to_dataframe(data)
     data = prepare_data(data)
 
-    # Process data using PCA
+    # TODO: Process data using PCA
     data = pca_reduce(data)
-    
-    print(data.head())
 
     # Find anomalies
     anomalies = []
@@ -121,6 +102,14 @@ def main():
             ycoords.append(data[feature_name][index])
         plt.scatter(xcoords, ycoords, c='r')
 
+    # # Determine correlations of anomalous time series
+    # if anomalies:
+    #     time_period = anomalies[0].get_time_window()
+    #     correlator = luminol.correlator.Correlator(ts, ts2, time_period)
+
+    # # Print correlation
+    # print(correlator.get_correlation_result().coefficient)
+    
     # Display the plot with metrics and anomalies
     plt.show()
 

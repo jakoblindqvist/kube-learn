@@ -7,23 +7,12 @@
                 "group": ["instance"],
                 "fill": true,
                 "smooth": true,
-                "smoothLevel": "5"
-            }
-        },
-        {
-            "name": "istio_request_count",
-            "flags": {
-                "rate": true,
-                "group": ["instance"],
-                "fill": true,
-                "smooth": true,
-                "smoothLevel": "5",
-                "normalize": true
+                "smoothLevel": "10"
             }
         }
     ],
     "times": {
         "startTime": "now() - 1h",
         "stopTime": "now() - 0h"
-        }
     }
+}
