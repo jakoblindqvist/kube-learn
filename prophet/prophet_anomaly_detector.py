@@ -5,7 +5,7 @@ from fbprophet import Prophet
 from workalendar.europe import Sweden
 from datetime import timedelta
 import time
-
+import math
 
 def weekend_hour(ds, h):
     """Indicator function for weekend hour h."""
@@ -137,30 +137,37 @@ def smooth_std_dev(std_dev, smooth_window = timedelta(hours=3)):
     new_std_dev["y"] = pd.Series(mean_std_dev).values
     return new_std_dev
 
-def get_anomalies(forecast, residual, dev_multiplier=1.5, window_delta=timedelta(hours = 4), percent_true=1):
+def get_anomalies(dev_forecast, residual, dev_multiplier=1.5, window_delta=timedelta(hours = 4), percent_true=1):
     anomalies = set()
 
-    start = forecast.index[0]
+    start = dev_forecast.index[0]
     stop = start + window_delta
-    window_size = len(forecast.loc[(forecast.index >= start) & (forecast.index <= stop)])
+    window_size = len(dev_forecast.loc[(dev_forecast.index >= start) & (dev_forecast.index <= stop)])
 
-    window_low = window_size / 2
-    window_high = window_low + window_size % 2
-    num_true = int(window_size * percent_true)
+    num_true = math.ceil(window_size * percent_true)
     window = [False] * window_size
+    extreme_window = [False] * window_size
     for i in range(len(residual.index) - window_size + 1):
         new_anomalies = set()
+        new_extreme_anomalies = set()
         for j in range(window_size):
             anom_time = residual.index[i + j]
-            max_val = forecast.at[anom_time, "yhat"]
+            max_val = dev_forecast.at[anom_time, "yhat"]
             val = residual[anom_time]
             is_anomaly = abs(val) > max_val*dev_multiplier
+            is_extreme_anomaly = abs(val) > max_val*dev_multiplier*4
+            extreme_window[j] = is_extreme_anomaly
             window[j] = is_anomaly
             if is_anomaly:
                 new_anomalies.add((anom_time, val))
+            if is_extreme_anomaly:
+                new_extreme_anomalies.add((anom_time, val))
 
         if window.count(True) >= num_true:
             anomalies |= new_anomalies
+
+        if extreme_window.count(True) > 0:
+            anomalies |= new_extreme_anomalies
 
     return sorted(list(anomalies))
 
@@ -224,6 +231,11 @@ def calculate_anomalies(raw_data, filtered_data=[], window_delta=timedelta(hours
     print "Forecasting data...",
     start = time.time()
     forecast = get_prediction(model, future)
+    #forecast = model.predict(future)
+    #fig = model.plot(forecast)
+    #fig.set_size_inches(22, 9)
+    #model.plot_components(forecast)
+    #forecast = forecast.set_index("ds")
     print " Done in", time.time() - start, "s"
 
     print "Getting standard deviation...",
@@ -246,6 +258,11 @@ def calculate_anomalies(raw_data, filtered_data=[], window_delta=timedelta(hours
     print "Forecasting standard deviation...",
     start = time.time()
     forecast_std_dev = get_prediction(model, future)
+    #forecast_std_dev = model.predict(future)
+    #fig = model.plot(forecast_std_dev)
+    #fig.set_size_inches(22, 9)
+    #model.plot_components(forecast_std_dev)
+    #forecast_std_dev = forecast_std_dev.set_index("ds")
     print " Done in", time.time() - start, "s"
 
     # fill empty

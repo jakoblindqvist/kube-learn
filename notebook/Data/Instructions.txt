@@ -1,0 +1,10 @@
+Dumps were created with "Elasticsearch Dump" (https://github.com/taskrabbit/elasticsearch-dump)
+
+https://github.com/taskrabbit/elasticsearch-dump
+
+Install Node JS (for npm)
+Install elasticdump: `npm install -g elasticdump`
+Import:
+elasticdump \
+  --input="metrics.json" \
+  --output="http://127.0.0.1:9200/"

@@ -47,6 +47,9 @@ def execute_query(client, query):
 def get_value_string(flags):
     value = "mean(\"f64\")"
 
+    if flags['sum']:
+        value = "sum(\"f64\")"
+
     if flags['rate'] and flags['nonNegRate']:
         raise ValueError("Cannot have both rate and nonNegRate set")
 
@@ -109,6 +112,7 @@ def generate_query(metric, times, groupTime):
     # Default flags
     flags = {
         'rate': False,
+        'sum': False,
         'nonNegRate': False,
         'rateTime': "1s",
         'where': [],
@@ -417,43 +421,3 @@ def get_metrics(query_configs, influx_config):
 
 if __name__ == '__main__':
     print "Influx fetcher loaded"
-
-""" conf = InfluxConfig(ip = "192.168.104.186")
-metric = {
-    'metrics': [
-                    {
-                        'name': 'node_cpu_norm',
-                        'flags': {
-                            'rate': True,
-                            'rateTime': "1m",
-                            'group': ["instance"],
-                        },
-                    },
-                    {
-                        'name': '/envoy_cluster_inbound_\d+__.*_sock_shop_svc_cluster_local_upstream_cx_connect_ms/',
-                        'flags': {
-                            'group': ["__name__"],
-                            'nonNegRate': True,
-                            'rateTime': "1m",
-                            'normalize': True
-                        }
-                    },
-                    {
-                        'name': 'istio_request_count',
-                        'flags': {
-                            'nonNegRate': True,
-                            'rateTime': "1m",
-                            'group': ["destination_service", "source_service"],
-                            'normalize': True,
-                            'where': ["\"destination_service\" !~ /metrics\.svc/"]
-                        }
-                    }
-                ],
-    'times': {
-        'startTime': "1530111004s",
-        'stopTime':  "1530165650s"
-    },
-    'groupTime': "1m"
-}
-
-get_metrics(metric, conf) """
